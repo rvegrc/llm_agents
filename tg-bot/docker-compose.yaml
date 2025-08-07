@@ -3,7 +3,7 @@ services:
     container_name: ollama-agents
     volumes:
       - ./backend/data/ollama:/root/.ollama
-      - ../models/:/custom/models
+      - ../../models/:/custom/models
     environment:
       - OLLAMA_MODELS=/custom/models
       - OLLAMA_SERVER_HOST=0.0.0.0
@@ -35,6 +35,17 @@ services:
     restart: unless-stopped
     networks:
       - llmnet 
+
+  # embeddings:
+  #   image: ghcr.io/huggingface/text-embeddings-inference:latest
+  #   ports:
+  #     - "28080:80"
+  #   volumes:
+  #     - ../../models:/models
+  #   environment:
+  #     - MODEL_ID=intfloat/multilingual-e5-large-instruct  # Official Hugging Face ID
+  #   networks:
+  #     - llmnet
 
   # api:
   #   build: ./api
