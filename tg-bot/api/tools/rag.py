@@ -52,12 +52,12 @@ def vectorstore_collection_init(
             distance=distance
         )
 
-        return QdrantVectorStore(
-            client=client_qd,
-            collection_name=collection_name,
-            embedding=embeddings,
-            vector_name="vector"
-        )
+    return QdrantVectorStore(
+        client=client_qd,
+        collection_name=collection_name,
+        embedding=embeddings,
+        vector_name="vector"
+    )
 
 
 def vectorstore_add_documents(

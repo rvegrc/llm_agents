@@ -1,6 +1,8 @@
 from typing import List
 from langchain_core.documents import Document
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+from langchain_core.runnables import RunnableConfig
+
 from qdrant_client import QdrantClient
 
 from tools.rag import vectorstore_collection_init
@@ -23,9 +25,6 @@ LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 # Initialize Qdrant client
 client_qd = QdrantClient(url=QDRANT_URL)
 
-# load from  backend
-user_id = '123'
-thread_id = '456'
 
 emb_model_name = '../../../models/multilingual-e5-large-instruct'
 embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
@@ -39,12 +38,24 @@ recall_memories_collection = vectorstore_collection_init(
     distance="Cosine"
 )
 
+def get_user_thread_id(config: RunnableConfig) -> str:
+    user_id = config["configurable"].get("user_id")
+    thread_id = config["configurable"].get("thread_id")
+    if user_id is None:
+        raise ValueError("User ID needs to be provided to save a memory.")
+    if thread_id is None:
+        raise ValueError("Thread ID needs to be provided to save a memory.")
+
+    return user_id, thread_id
+
 
 
 def save_recall_memories(
-        memory: str       
+        memory: str,
+        config: RunnableConfig       
         ) -> str:
     """Save recall memory to vectorstore for later semantic retrieval."""
+    user_id, thread_id = get_user_thread_id(config)
     document = Document(
         page_content=memory, metadata={"user_id": user_id, 'thread_id': thread_id}
     )
@@ -53,9 +64,12 @@ def save_recall_memories(
 
 
 def search_recall_memories(
-        query: str
+        query: str,
+        config: RunnableConfig
 ) -> List[str]:
     """Search for relevant recall memories."""
+
+    user_id, thread_id = get_user_thread_id(config)
     
     # Filter by user_id and thread_id
     qdrant_filter = {
