@@ -70,7 +70,7 @@ def vectorstore_add_documents(
     ''' Add documents to the Qdrant collection. '''
     
      # Initialize vectorstore collection
-    vs_collection = vectorstore_init(
+    vs_collection = vectorstore_collection_init(
         client_qd=client_qd,
         collection_name=collection_name,
         embeddings=embeddings,

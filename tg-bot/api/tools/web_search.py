@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # @tool
-def search_tool(query: str) -> TavilySearch:
+def web_search_tool(query: str) -> TavilySearch:
     """Search in Internet by TavilySearch for a query and return the results."""
     search = TavilySearch(
         max_results=2,
