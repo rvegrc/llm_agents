@@ -1,4 +1,41 @@
 services:
+  ollama:
+    container_name: ollama-agents
+    volumes:
+      - ./backend/data/ollama:/root/.ollama
+      - ../models/:/custom/models
+    environment:
+      - OLLAMA_MODELS=/custom/models
+      - OLLAMA_SERVER_HOST=0.0.0.0
+    ports:
+      - "21434:11434"
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    # image: ollama/ollama:0.5.8
+    networks:
+      - llmnet 
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
+    container_name: open-webui-agents
+    volumes:
+      - ./frontend/data/open-webui:/app/backend/data
+    depends_on:
+      - ollama
+    ports:
+      - ${OPEN_WEBUI_PORT-3000}:8080
+    env_file:
+      - .env
+      # - 'OLLAMA_BASE_URL='
+      # - 'WEBUI_SECRET_KEY='
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    restart: unless-stopped
+    networks:
+      - llmnet 
+
   # api:
   #   build: ./api
   #   ports:
@@ -30,7 +67,7 @@ services:
   qdrant:
     # use api-key for access
     image: qdrant/qdrant:v1.15
-    container_name: qdrant-llm
+    container_name: qdrant-agents
     volumes:
       - ./vector_store/qdrant_data:/qdrant/storage:z
     ports:
@@ -47,3 +84,4 @@ volumes:
 networks:
   llmnet:
     driver: bridge
+
