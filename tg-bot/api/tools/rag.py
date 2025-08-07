@@ -3,31 +3,9 @@ from langchain_qdrant import QdrantVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import SentenceTransformer
 from langchain_core.documents import Document
-from langchain_core.runnables import Runnable, RunnablePassthrough, chain, RunnableConfig
 
-from pydantic import BaseModel, Field
 
 from typing import List
-import os
-import uuid
-
-from dotenv import load_dotenv
-load_dotenv()
-
-QDRANT_URL = os.getenv("QDRANT_URL")
-
-# api key in env variable QDRANT__SERVICE__API_KEY
-client_qd = QdrantClient(url=QDRANT_URL)
-
-# Health check for Qdrant connection
-try:
-    collections = client_qd.get_collections()    
-except Exception as e:
-    print("Vectorstore connection failed:", str(e))
-
-# for deploy models use from vllm server
-emb_model_name = '../../../../models/Qwen3-Embedding-0.6B'
-embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
 
 
 def add_qd_collection(
