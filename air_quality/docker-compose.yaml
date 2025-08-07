@@ -5,7 +5,7 @@ services:
     ports:
       - "8123:8123"  # HTTP to ClickHouse
       - "9000:9000"  # to DB 
-    envfile:
+    env_file:
     - .env
     volumes:
       - ./clickhouse_data:/var/lib/clickhouse
@@ -23,27 +23,10 @@ services:
       - "6333:6333"
       - "6334:6334"
     restart: unless-stopped
-    envfile:
+    env_file:
      - .env
     networks:
       - llmnet 
-
-    environment:
-      - QDRANT__SERVICE__GRPC_PORT=6334
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY} # Set your API key here
-
-from qdrant_client import QdrantClient
-
-client = QdrantClient(
-    url="http://localhost:6333",
-    api_key="your-strong-api-key-here",
-)
-
-# Test connection
-collections = client.get_collections()
-print(collections)
-
 
 volumes:  
   clickhouse_data: {}
