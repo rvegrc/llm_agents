@@ -8,15 +8,14 @@ from langchain_core.documents import Document
 from typing import List
 
 
-def add_qd_collection(
-        documents: List[Document], 
+def vectorstore_add_collection(
         embeddings: HuggingFaceEmbeddings,
         client_qd: QdrantClient, 
-        collection_name: str, 
+        collection_name: str,
         distance: str = "Cosine"
     ) -> None:
     
-    ''' Add documents to a Qdrant collection. Creates the collection if it does not exist. Use HuggingFaceEmbeddings for embeddings.'''
+    ''' Creates the collection if it does not exist. Use HuggingFaceEmbeddings for embeddings.'''
         
     embedding_dim = SentenceTransformer(embeddings.model_name).get_sentence_embedding_dimension()
 
@@ -32,19 +31,57 @@ def add_qd_collection(
             },
         )
 
+# distance = "Cosine"  
+# collection_name = 'recall_memories'
 
-    # Initialize vector store
-    qdrant = QdrantVectorStore(
-        client=client_qd,
+def vectorstore_collection_init(
+        client_qd: QdrantClient, 
+        collection_name: str, 
+        embeddings: HuggingFaceEmbeddings, 
+        distance: str = "Cosine"
+    ) -> QdrantVectorStore:
+    
+    ''' Initialize a vector store for memory. '''
+    
+    # Check if the collection exists
+    if not client_qd.collection_exists(collection_name):
+        vectorstore_add_collection(
+            embeddings=embeddings,
+            client_qd=client_qd,
+            collection_name=collection_name,
+            distance=distance
+        )
+
+        return QdrantVectorStore(
+            client=client_qd,
+            collection_name=collection_name,
+            embedding=embeddings,
+            vector_name="vector"
+        )
+
+
+def vectorstore_add_documents(
+        client_qd: QdrantClient, 
+        collection_name: str, 
+        documents: List[Document], 
+        embeddings: HuggingFaceEmbeddings
+    ) -> None:
+    
+    ''' Add documents to the Qdrant collection. '''
+    
+     # Initialize vectorstore collection
+    vs_collection = vectorstore_init(
+        client_qd=client_qd,
         collection_name=collection_name,
-        embedding=embeddings,
-        vector_name="vector"
+        embeddings=embeddings,
+        vector_name="vector",
     )
 
-    # Add documents to the collection
-    qdrant.add_documents(documents=documents)
 
-def del_qd_collection(
+    # Add documents to the vectorstore collection
+    vs_collection.add_documents(documents=documents)
+
+def vectorstore_del_collection(
         client_qd: QdrantClient, 
         collection_name: str
     ) -> None:
@@ -60,31 +97,4 @@ def del_qd_collection(
 # create a vector store for recall if it does not exist
 
 
-# distance = "Cosine"  
-# collection_name = 'recall_memories'
 
-def rag_tool(
-        client_qd: QdrantClient, 
-        collection_name: str, 
-        embeddings: HuggingFaceEmbeddings, 
-        distance: str = "Cosine"
-    ) -> QdrantVectorStore:
-    
-    ''' Initialize a vector store for recall memory. '''
-    
-    # Check if the collection exists
-    if not client_qd.collection_exists(collection_name):
-        add_qd_collection(
-            documents=[],  # Start with an empty list, will add later
-            embeddings=embeddings,
-            client_qd=client_qd,
-            collection_name=collection_name,
-            distance=distance
-        )
-
-    return QdrantVectorStore(
-        client=client_qd,
-        collection_name=collection_name,
-        embedding=embeddings,
-        vector_name="vector"
-    )
