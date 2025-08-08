@@ -30,7 +30,7 @@ from qdrant_client import QdrantClient
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import  END, START, MessagesState, StateGraph
 from langgraph.checkpoint.memory import InMemorySaver
-from IPython.display import Image, display
+# from IPython.display import Image, display
 
 # Import necessary tools
 from tools.memory import save_recall_memories, search_recall_memories
@@ -65,7 +65,7 @@ class State(MessagesState):
 
 logging.info("LLM and embeddings initializing.")
 
-emb_model_name = '../../../models/multilingual-e5-large-instruct'
+emb_model_name = '/models/multilingual-e5-large-instruct'
 embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
 
 LLM_MODEL_NAME='qwen3:0.6b'

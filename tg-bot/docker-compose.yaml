@@ -53,10 +53,10 @@ services:
     ports:
       - "8000:8000"
     env_file:
-     - .env
+     - ./api/.env
     volumes:
       - ./api:/app
-      - ../../../models:/models
+      - ../../models:/models
     deploy:
       resources:
         limits:
@@ -71,7 +71,7 @@ services:
     depends_on:
       - api
     env_file:
-      - .env
+      - ./bot/.env
     volumes:
       - ./bot:/app
     networks:

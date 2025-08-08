@@ -26,7 +26,7 @@ LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 client_qd = QdrantClient(url=QDRANT_URL)
 
 
-emb_model_name = '../../../models/multilingual-e5-large-instruct'
+emb_model_name = '/models/multilingual-e5-large-instruct'
 embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
 
 
