@@ -1,4 +1,4 @@
-Структура проекта telegram bot
+пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ telegram bot
 
 
 tg-bot/
@@ -16,7 +16,4 @@ tg-bot/
  .env.example
 
 
-Структура проекта bitrix
-
-
-Документация по Битрикс24 используемая в проекте взята с официального репозитория https://github.com/bitrix-tools/b24-rest-docs
+Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ РїРѕ Р‘РёС‚СЂРёРєСЃСѓ https://github.com/bitrix-tools/b24-rest-docs
