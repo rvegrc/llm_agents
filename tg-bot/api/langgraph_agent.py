@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from typing import List
 from langchain_core.messages import get_buffer_string
 from langchain_core.runnables import RunnableConfig
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, FunctionMessage, ToolMessage
@@ -89,31 +89,32 @@ logging.info("Tools bound to LLM.")
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("""
-            'system_message'
-            You are a helpful assistant. Use long-term, recall memory and retrieval tools internally to inform your answers.
-            If the user asks simple, general knowledge or factual questions (e.g., "What is the capital of France?"), answer immediately and directly without consulting external memory or tools.
-            Do not explain your internal thoughts. Only respond to the user's questions clearly and concisely.
-            You must rely on external tools and memory systems  to store information between conversations. You can also perform Retrieval-Augmented
-            Generation (RAG) to access relevant knowledge in real-time.
-            Use the guidelines below to engage with the user.
+        SystemMessagePromptTemplate.from_template("""
+            You are a helpful assistant. Follow these rules STRICTLY:
+            1. NEVER reveal your internal thought process or reasoning
+            2. NEVER output any XML tags like <think> or </think>
+            3. Respond DIRECTLY to queries without asking for clarification unless absolutely necessary
+            4. For factual questions, answer immediately without tool use
+            5. Only use tools when essential for answering the question
+            ONLY use tools when:
+            - The question requires current information (use web_search_tool)
+            - The question relates to past conversations (use search_recall_memories)
+            - You need to store important information (use save_recall_memories)
 
-         
+            
             ## MEMORY USAGE GUIDELINES
             
-            1. Actively use memory tools to build a 
-            comprehensive understanding of the user.
+            1. Actively use memory tools to build a comprehensive understanding of the user.
             2. Make informed suppositions and extrapolations based on stored memories.
             3. Regularly reflect on past interactions to identify patterns and preferences.
             4. Update your mental model of the user with each new piece of information.
             5. Cross-reference new information with existing memories for consistency.
             6. Store emotional context and personal values alongside factual information.
-            7. Use memory to anticipate needs and tailor responses to the user’s style.
+            7. Use memory to anticipate needs and tailor responses to the user's style.
             8. Recognize and acknowledge changes in the user's situation or perspective.
             9. Leverage memories to provide personalized examples and analogies.
             10. Recall past challenges or successes to inform current problem-solving.
 
-            
             ## RAG USAGE GUIDELINES
             
             - Use RAG every time you do internet search to get some external information.
@@ -122,23 +123,12 @@ prompt = ChatPromptTemplate.from_messages(
             - Use RAG to provide accurate and timely responses to user queries.
             - Use RAG to access a wide range of user conversation history.
 
-            
             ## RECALL MEMORIES GUIDELINES
             
             Recall memories are contextually retrieved based on the current conversation:
             {recall_memories}
-
-            ## INSTRUCTIONS
-           
-            Engage with the user naturally, as a trusted colleague or friend. 
-            Do not explicitly mention your memory or retrieval capabilities. 
-            Instead, seamlessly integrate them into your responses. 
-            Be attentive to subtle cues and underlying emotions. 
-            Adapt your communication style to match the user's preferences and current emotional state. 
-            If you use tools, call them internally and respond only after the tool operation 
-            completes successfully. 
         """),
-        ("placeholder", "{messages}"),
+        MessagesPlaceholder(variable_name="messages"),
     ]
 )
 
@@ -171,45 +161,50 @@ logging.info("Function for loading memories created.")
 
 logging.info("Creating the agent and routing...")
 
-def agent(state: State) -> State:
-    """Process the current state and generate a response using the LLM.
+def clean_response(response: str) -> str:
+    """Remove any internal thinking tags from the response."""
+    import re
+    # Remove <think>...</think> blocks
+    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    # Remove any other XML tags
+    response = re.sub(r'<\/?[a-z_]+>', '', response)
+    return response.strip()
 
-    Args:
-        state (schemas.State): The current state of the conversation.
-
-    Returns:
-        schemas.State: The updated state with the agent's response.
-    """
-    bound = prompt | llm_with_tools
-    # recall_str = (
-    #     "<recall_memory>\n" + "\n".join(state["messages"]) + "\n</recall_memory>"
-    # )
-
-    recall_str = (
-        "<recall_memory>\n" +
-        "\n".join(
-            m.content for m in state["messages"] 
-            if hasattr(m, "content") and not isinstance(m, ToolMessage)
-        ) + 
+def format_recall_memory(messages: list) -> str:
+    """Format relevant messages for recall memory."""
+    relevant_messages = []
+    
+    for msg in messages:
+        # Skip system messages and tool outputs
+        if isinstance(msg, (SystemMessage, ToolMessage)):
+            continue
+            
+        # Format human and AI messages
+        if isinstance(msg, HumanMessage):
+            relevant_messages.append(f"User: {msg.content}")
+        elif isinstance(msg, AIMessage):
+            relevant_messages.append(f"Assistant: {msg.content}")
+    
+    return (
+        "<recall_memory>\n" + 
+        "\n".join(relevant_messages) + 
         "\n</recall_memory>"
-    )
+    ) if relevant_messages else ""
 
-    prediction = bound.invoke(
-        {
-            "messages": state["messages"],
-            "recall_memories": recall_str,
-        }
-    )
 
-    # save the response in the long-term memory in the future
-    # vectorstore_add_documents(
-    #     client_qd=client_qd,
-    #     collection_name='long_term_memory',
-    #     documents=[Document(page_content=prediction.content)],
-    #     embeddings=embeddings
-    # )
+def agent(state: State) -> State:
+    bound = prompt | llm_with_tools
+    prediction = bound.invoke({
+        "messages": state["messages"],
+        "recall_memories": format_recall_memory(state["messages"]),
+    })
+    
+    # Clean the response
+    if hasattr(prediction, 'content'):
+        prediction.content = clean_response(prediction.content)
+    
     return {
-        "messages": [prediction],
+        "messages": state["messages"] + [prediction],
     }
 
 def route_tools(state: State):

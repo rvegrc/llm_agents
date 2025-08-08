@@ -49,6 +49,7 @@ services:
 
   api:
     build: ./api
+    container_name: agents-api
     ports:
       - "8000:8000"
     env_file:
@@ -64,16 +65,17 @@ services:
     networks:
       - llmnet
 
-  # bot:
-  #   build: ./bot
-  #   depends_on:
-  #     - api
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./bot:/app
-  #   networks:
-  #     - llmnet
+  bot:
+    build: ./bot
+    container_name: tg-bot
+    depends_on:
+      - api
+    env_file:
+      - .env
+    volumes:
+      - ./bot:/app
+    networks:
+      - llmnet
 
 # for production use TLS and generating JSON Web Tokens
   qdrant:
