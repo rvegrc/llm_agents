@@ -12,7 +12,7 @@ logging.basicConfig(
 
 logging.getLogger().info("Logging is set up.")
 
-logging.info("Importing necessary modules for the application...")
+logging.info("Importing necessary modules for the application and load environment variables.")
 
 from langchain_core.runnables import RunnableLambda
 from fastapi import FastAPI, Request
@@ -25,6 +25,7 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, FunctionMessage, ToolMessage
 from langchain_openai import ChatOpenAI
+
 from qdrant_client import QdrantClient
 
 from langgraph.prebuilt import ToolNode
@@ -43,10 +44,6 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-logging.info("Environment variables loaded.")
-
-logging
-
 # Initialize LangSmith project
 os.environ["LANGSMITH_PROJECT"] = 'tg-bot'
 
@@ -54,19 +51,30 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")
 # LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 
+logging.info("Modules and Environment variables loaded.")
+logging.info("Initializing Qdrant client.")
+
 # Initialize Qdrant client
 client_qd = QdrantClient(url=QDRANT_URL)
 
-logging
-
+logging.info("Qdrant client initialized.")
 
 class State(MessagesState):
     messages: List[BaseMessage]
 
 logging.info("LLM and embeddings initializing.")
 
-emb_model_name = '/models/multilingual-e5-large-instruct'
-embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
+# emb_model_name = '/models/multilingual-e5-large-instruct'
+# embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
+
+emb_model_name = 'nomic-embed-text'
+
+embeddings = OllamaEmbeddings(
+    base_url=f'http://ollama:11434',
+    model=emb_model_name
+)
+
+logging.info(f"Using embeddings model: {emb_model_name}")
 
 LLM_MODEL_NAME='qwen3:0.6b'
 

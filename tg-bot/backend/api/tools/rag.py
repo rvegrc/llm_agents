@@ -1,6 +1,7 @@
 from qdrant_client import QdrantClient
 from langchain_qdrant import QdrantVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import OllamaEmbeddings
 from sentence_transformers import SentenceTransformer
 from langchain_core.documents import Document
 
@@ -9,15 +10,18 @@ from typing import List
 
 
 def vectorstore_add_collection(
-        embeddings: HuggingFaceEmbeddings,
+        embeddings: OllamaEmbeddings,
         client_qd: QdrantClient, 
         collection_name: str,
         distance: str = "Cosine"
     ) -> None:
     
-    ''' Creates the collection if it does not exist. Use HuggingFaceEmbeddings for embeddings.'''
-        
-    embedding_dim = SentenceTransformer(embeddings.model_name).get_sentence_embedding_dimension()
+    ''' Creates the collection if it does not exist. Use HuggingFaceEmbeddings for embeddings.''' 
+
+    embedding_dim = len(embeddings.embed_query("test"))
+
+    # for HuggingFaceEmbeddings
+    # embedding_dim = SentenceTransformer(embeddings.model_name).get_sentence_embedding_dimension()
 
     # Create collection if it doesn't exist
     if not client_qd.collection_exists(collection_name):
@@ -37,7 +41,7 @@ def vectorstore_add_collection(
 def vectorstore_collection_init(
         client_qd: QdrantClient, 
         collection_name: str, 
-        embeddings: HuggingFaceEmbeddings, 
+        embeddings: OllamaEmbeddings,
         distance: str = "Cosine"
     ) -> QdrantVectorStore:
     
@@ -46,7 +50,7 @@ def vectorstore_collection_init(
     # Check if the collection exists
     if not client_qd.collection_exists(collection_name):
         vectorstore_add_collection(
-            embeddings=embeddings,
+            embeddings=embeddings,            
             client_qd=client_qd,
             collection_name=collection_name,
             distance=distance
@@ -64,7 +68,7 @@ def vectorstore_add_documents(
         client_qd: QdrantClient, 
         collection_name: str, 
         documents: List[Document], 
-        embeddings: HuggingFaceEmbeddings
+        embeddings: OllamaEmbeddings,        
     ) -> None:
     
     ''' Add documents to the Qdrant collection. '''

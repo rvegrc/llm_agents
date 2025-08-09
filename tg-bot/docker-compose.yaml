@@ -1,5 +1,9 @@
 services:
+  
+  # BACKEND
   ollama:
+    # image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    image: ollama/ollama:0.11.4
     container_name: ollama-agents
     volumes:
       - ./backend/data/ollama_data:/root/.ollama
@@ -12,8 +16,6 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
-    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
-    # image: ollama/ollama:0.5.8
     networks:
       - llmnet 
 
@@ -30,7 +32,26 @@ services:
     restart: unless-stopped
     networks:
       - llmnet 
+  
+  api:
+    build: ./backend/api
+    container_name: agents-api
+    ports:
+      - "8000:8000"
+    env_file:
+     - ./backend/api/.env
+    volumes:
+      - ./backend/api:/app
+      - ../../models:/models
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    networks:
+      - llmnet
 
+  # FRONTEND
   open-webui:
     image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
     container_name: open-webui-agents
@@ -45,8 +66,8 @@ services:
       - .env
       # - OLLAMA_BASE_URL=
       # - WEBUI_SECRET_KEY=
-      # - VECTOR_DB=qdrant
-      # - QDRANT_URI=http://qdrant:6333/
+      # - VECTOR_DB=
+      # - QDRANT_URI=
       # - QDRANT_API_KEY=your_api_key_here   # only if you use api key auth
     environment:
       - QDRANT_URI=${QDRANT_URL}
@@ -55,52 +76,24 @@ services:
     networks:
       - llmnet 
 
-  # embeddings:
-  #   image: ghcr.io/huggingface/text-embeddings-inference:latest
-  #   ports:
-  #     - "28080:80"
-  #   volumes:
-  #     - ../../models:/models
-  #   environment:
-  #     - MODEL_ID=intfloat/multilingual-e5-large-instruct  # Official Hugging Face ID
-  #   networks:
-  #     - llmnet
-
-  api:
-    build: ./api
-    container_name: agents-api
-    ports:
-      - "8000:8000"
-    env_file:
-     - ./api/.env
-    volumes:
-      - ./api:/app
-      - ../../models:/models
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-    networks:
-      - llmnet
 
   bot:
-    build: ./bot
+    build: ./frontend/bot
     container_name: tg-bot
     depends_on:
       - api
     env_file:
-      - ./bot/.env
+      - ./frontend/bot/.env
     volumes:
-      - ./bot:/app
+      - ./frontend/bot:/app
     networks:
       - llmnet
 
-
-
-volumes:  
-  clickhouse_data: {}
+volumes:
+  ollama_data: {}
+  models: {}
   qdrant_data: {}
+  open-webui: {}
 
 networks:
   llmnet:
