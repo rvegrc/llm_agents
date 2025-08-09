@@ -25,7 +25,7 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, FunctionMessage, ToolMessage
 from langchain_openai import ChatOpenAI
-
+from langchain_ollama import OllamaEmbeddings
 from qdrant_client import QdrantClient
 
 from langgraph.prebuilt import ToolNode
@@ -70,7 +70,7 @@ logging.info("LLM and embeddings initializing.")
 emb_model_name = 'nomic-embed-text'
 
 embeddings = OllamaEmbeddings(
-    base_url=f'http://ollama:11434',
+    base_url=LLM_API_SERVER_URL,
     model=emb_model_name
 )
 
@@ -80,7 +80,7 @@ LLM_MODEL_NAME='qwen3:0.6b'
 
 llm = ChatOpenAI(
     model=LLM_MODEL_NAME,
-    openai_api_base=LLM_API_SERVER_URL,
+    openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
     api_key="EMPTY",  # required by LangChain, but not used by Ollama
     temperature=0.2,
     max_tokens=200

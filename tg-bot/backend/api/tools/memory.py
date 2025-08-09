@@ -23,7 +23,7 @@ from langchain_core.runnables import RunnableConfig
 
 from qdrant_client import QdrantClient
 
-from tools.rag import vectorstore_collection_init
+from .rag import vectorstore_collection_init
 
 # class agent with id  and thread do in api
 
@@ -51,16 +51,16 @@ logging.info("Qdrant client initialized.")
 # emb_model_name = '/models/multilingual-e5-large-instruct'
 # embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
 
-logging.info("Using Ollama embeddings.")
+logging.info("Initializing embeddings.")
 
 emb_model_name = 'nomic-embed-text'
 
 embeddings = OllamaEmbeddings(
-    base_url=f'http://ollama:11434',
+    base_url=LLM_API_SERVER_URL,
     model=emb_model_name
 )
 
-logging.info(f"Using embeddings model: {emb_model_name}")
+logging.info(f"Loaded embeddings model: {emb_model_name}")
 
 
 recall_memories_collection = vectorstore_collection_init(

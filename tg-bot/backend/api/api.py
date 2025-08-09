@@ -47,31 +47,31 @@ class PromptRequest(BaseModel):
     user_id: str
     thread_id: str
 
-# @app.post("/generate")
-# async def generate_text(request: PromptRequest):
-#     """
-#     Generate a response from the LLM agent using the provided prompt, user_id, and thread_id.
-#     """
-#     logger.info(f"Incoming /generate request | user_id={request.user_id} thread_id={request.thread_id}")
-
-#     # Optional: check API token (if you want security for internal calls)
-#     if API_TOKEN and os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true":
-#         # Here you could verify an Authorization header
-#         pass
-
-#     try:
-#         from langgraph_agent import chat_with_agent
-#         generated_text = chat_with_agent(request.prompt, request.user_id, request.thread_id)
-#         logger.info("Generated text successfully")
-#         return {"generated_text": generated_text}
-
-#     except Exception as e:
-#         logger.exception("Error in /generate endpoint")
-#         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/generate")
 async def generate_text(request: PromptRequest):
-    return {"generated_text": f"Echo: {request.prompt}"}
+    """
+    Generate a response from the LLM agent using the provided prompt, user_id, and thread_id.
+    """
+    logger.info(f"Incoming /generate request | user_id={request.user_id} thread_id={request.thread_id}")
+
+    # Optional: check API token (if you want security for internal calls)
+    if API_TOKEN and os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true":
+        # Here you could verify an Authorization header
+        pass
+
+    try:
+        from langgraph_agent import chat_with_agent
+        generated_text = chat_with_agent(request.prompt, request.user_id, request.thread_id)
+        logger.info("Generated text successfully")
+        return {"generated_text": generated_text}
+
+    except Exception as e:
+        logger.exception("Error in /generate endpoint")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# @app.post("/generate")
+# async def generate_text(request: PromptRequest):
+#     return {"generated_text": f"Echo: {request.prompt}"}
 
 
 @app.get("/health")
