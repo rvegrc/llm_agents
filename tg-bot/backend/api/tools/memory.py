@@ -23,15 +23,15 @@ from langchain_core.runnables import RunnableConfig
 
 from qdrant_client import QdrantClient
 
+# from dotenv import load_dotenv
+# load_dotenv()
+
 from .rag import vectorstore_collection_init
 
 # class agent with id  and thread do in api
 
-
 import os
 import requests
-from dotenv import load_dotenv
-load_dotenv()
 
 # Initialize LangSmith project
 os.environ["LANGSMITH_PROJECT"] = 'tg-bot'

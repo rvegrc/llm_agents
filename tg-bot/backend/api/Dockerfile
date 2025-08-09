@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api.py .
-COPY .env .
+# COPY .env .
 COPY langgraph_agent.py .
 COPY /tools ./tools
 

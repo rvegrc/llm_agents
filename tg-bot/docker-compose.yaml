@@ -39,7 +39,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-     - ./backend/api/.env
+     - .env
     volumes:
       - ./backend/api:/app
       - ../../models:/models
@@ -83,7 +83,7 @@ services:
     depends_on:
       - api
     env_file:
-      - ./frontend/bot/.env
+      - .env
     volumes:
       - ./frontend/bot:/app
     networks:
