@@ -19,8 +19,6 @@ tg-bot/
  docker-compose.yml
  .env
 
-
- ## ������
  text gen:
   - https://huggingface.co/unsloth/Qwen2.5-0.5B
   - https://huggingface.co/Qwen/Qwen3-0.6B
