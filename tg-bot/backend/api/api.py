@@ -1,7 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -41,6 +41,9 @@ app = FastAPI(
 
 API_TOKEN = os.getenv("API_TOKEN")  # Optional: for authentication
 
+
+print("API Token:", API_TOKEN)
+
 # Request model
 class PromptRequest(BaseModel):
     prompt: str
@@ -48,16 +51,44 @@ class PromptRequest(BaseModel):
     thread_id: str
 
 @app.post("/generate")
-async def generate_text(request: PromptRequest):
+async def generate_text(
+    request: PromptRequest,
+    authorization: str = Header(None)
+):
     """
     Generate a response from the LLM agent using the provided prompt, user_id, and thread_id.
+    Requires API key authentication if enabled.
     """
     logger.info(f"Incoming /generate request | user_id={request.user_id} thread_id={request.thread_id}")
 
-    # Optional: check API token (if you want security for internal calls)
-    if API_TOKEN and os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true":
-        # Here you could verify an Authorization header
-        pass
+    # API key check (optional, controlled by REQUIRE_API_TOKEN)
+    if os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true":
+        api_token_env = os.getenv("API_TOKEN")
+
+        # No Authorization header
+        if not authorization:
+            logger.warning("Unauthorized request: Missing Authorization header")
+            raise HTTPException(
+                status_code=401,
+                detail="You must provide an API token in the Authorization header."
+            )
+
+        # Wrong format
+        if not authorization.startswith("Bearer "):
+            logger.warning("Unauthorized request: Invalid Authorization header format")
+            raise HTTPException(
+                status_code=400,
+                detail="Authorization header must be in format: Bearer <API_TOKEN>."
+            )
+
+        # Extract and validate token
+        provided_token = authorization.split("Bearer ")[1].strip()
+        if provided_token != api_token_env:
+            logger.warning("Unauthorized request: Invalid API token")
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid API token. Please provide the correct one."
+            )
 
     try:
         from langgraph_agent import chat_with_agent

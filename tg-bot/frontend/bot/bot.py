@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")         # Your Telegram bot token
-API_URL = os.getenv("API_URL")              # Your FastAPI endpoint
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+API_URL = os.getenv("API_URL")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
