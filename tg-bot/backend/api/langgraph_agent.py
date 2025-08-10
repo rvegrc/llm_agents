@@ -188,17 +188,30 @@ def load_memories(state: State, config: RunnableConfig) -> State:
     Returns:
         State: The updated state with loaded memories.
     """
-    # add long-term memory search in future    
-    
+    # Search for long-term memories in Qdrant
     search_recall_memories_runnable = RunnableLambda(search_recall_memories)
+    recall_contents = search_recall_memories_runnable.invoke(
+        state["question"].content
+    )
 
-    # conv_str = get_buffer_string([state["question"]]) # get user question from the conversation
-    # conv_str = tokenizer.decode(tokenizer.encode(conv_str)[-2048:]) # tokenize last messages and limit to 2048 tokens
-    recall_memories = search_recall_memories_runnable.invoke(state["question"].content, config)
-    return {
-        "messages": recall_memories,
-        "question": state["question"]
-    }
+    # If memories were found, merge them into one string
+    if recall_contents:
+        recall_text = "\n".join(recall_contents)
+
+        # Wrap the recall text in an AIMessage so it matches the conversation format
+        memory_msg = AIMessage(content=f"[recall_memory]\n{recall_text}")
+
+        # Append this memory message to the existing conversation history
+        messages = state.get("messages", []) + [memory_msg]
+    else:
+        # If no memories found, keep the same conversation history
+        messages = state.get("messages", [])
+
+    # Return updated state with the loaded memories added to the messages
+    return State(
+        messages=messages,
+        question=state["question"]
+    )
 
 logging.info("Function for loading memories created.")
 
@@ -271,6 +284,16 @@ logging.info("Agent created.")
 logging.info("Creating function for saving user interaction...")
 
 def save_user_interaction(state: State, config: RunnableConfig) -> None:
+    """Save the user interaction to recall memories.
+
+    Args:
+        state (State): The current state of the conversation.
+        config (RunnableConfig): The runtime configuration for the agent.
+
+    Returns:
+        None
+    """
+    
     user_input = state["question"].content
     assistant_output = state["messages"][-1].content
     memory = f'''{{
@@ -319,7 +342,7 @@ def pretty_print_stream_chunk(chunk):
         print(f"Update from node: {node}")
         if "messages" in updates:
             if updates["messages"]:  # check not empty
-                pprint(updates["messages"][-1].content)
+                pprint(updates["messages"][-1].content)                
             else:
                 print("<No messages in updates>")
         else:

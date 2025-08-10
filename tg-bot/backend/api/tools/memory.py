@@ -21,7 +21,7 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.runnables import RunnableConfig
 
-from qdrant_client import QdrantClient
+from qdrant_client import QdrantClient, models
 
 # from dotenv import load_dotenv
 # load_dotenv()
@@ -63,7 +63,7 @@ embeddings = OllamaEmbeddings(
 logging.info(f"Loaded embeddings model: {emb_model_name}")
 
 
-recall_memories_collection = vectorstore_collection_init(
+recall_memories = vectorstore_collection_init(
     client_qd=client_qd,
     collection_name='recall_memories',
     embeddings=embeddings,
@@ -89,39 +89,41 @@ def save_recall_memories(
     """Save recall memory to vectorstore for later semantic retrieval."""
     user_id, thread_id = get_user_thread_id(config)
     document = Document(
-        page_content=memory, metadata={"user_id": user_id, 'thread_id': thread_id}
+        page_content=memory,
+        metadata={"user_id": user_id, 'thread_id': thread_id}
     )
-    recall_memories_collection.add_documents([document])
+    recall_memories.add_documents([document])
     return memory
 
 
 def search_recall_memories(
         query: str,
         config: RunnableConfig
-) -> List[str]:
+    ) -> List[str]:
     """Search for relevant recall memories."""
 
     user_id, thread_id = get_user_thread_id(config)
     
     # Filter by user_id and thread_id
-    qdrant_filter = {
-        "must": [
-            {
-                "key": "user_id",
-                "match": {"value": user_id},
-            },
-            {
-                "key": "thread_id",
-                "match": {"value": thread_id},
-            },
+    qdrant_filter = models.Filter(
+        must=[
+            models.FieldCondition(
+                key="metadata.user_id",
+                match=models.MatchValue(value=user_id),
+            ),
+            models.FieldCondition(
+                key="metadata.thread_id",
+                match=models.MatchValue(value=thread_id),
+            ),
         ]
-    }
+    )
 
-    documents = recall_memories_collection.similarity_search(
+    documents = recall_memories.similarity_search(
         query,
         k=3,
         filter=qdrant_filter,  # structured filter required by QdrantVectorStore
     )
+
     return [doc.page_content for doc in documents]
 
 
