@@ -80,24 +80,26 @@ logging.info(f"Using embeddings model: {emb_model_name}")
 
 # LLM_MODEL_NAME='qwen3:0.6b'
 # LLM_MODEL_NAME='qwen3:1.7b'
+LLM_MODEL_NAME='deepseek-r1:1.5b'
 
-# llm = ChatOpenAI(
-#     model=LLM_MODEL_NAME,
-#     openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
-#     api_key="EMPTY",  # required by LangChain, but not used by Ollama
-#     temperature=0.2,
-#     max_tokens=200
-# )
+llm = ChatOpenAI(
+    model=LLM_MODEL_NAME,
+    openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
+    api_key="EMPTY",  # required by LangChain, but not used by Ollama
+    temperature=0.2,
+    max_tokens=200
+)
 
-from langchain.chat_models import init_chat_model
+# for testing
+# from langchain.chat_models import init_chat_model
 
-llm = init_chat_model(
-    model="gpt-4.1-mini"
-    ,model_provider="openai"
-    ,temperature=0.2
-    # ,max_tokens=1000
-    ,top_p=0.5
-    )
+# llm = init_chat_model(
+#     model="gpt-4.1-mini"
+#     ,model_provider="openai"
+#     ,temperature=0.2
+#     # ,max_tokens=1000
+#     ,top_p=0.5
+#     )
 
 
 
@@ -332,16 +334,19 @@ logging.info("Creating chat_with_agent function...")
 def chat_with_agent(user_input: str, user_id: str, thread_id: str) -> str:
     """Send a user input string to the agent and return the agent's final response."""
     config = {"configurable": {"user_id": user_id, "thread_id": thread_id}}
-    
-    final_chunk = None
-    for chunk in graph.stream({'question': HumanMessage(content=user_input)}, config=config):
-        pretty_print_stream_chunk(chunk)
-        final_chunk = chunk
 
-    # Extract the last agent message content safely
-    agent_node = final_chunk.get("save_user_interaction")
+    chunks = {}
+    for chunk in graph.stream({'question': HumanMessage(content=user_input)}, config=config):
+        pretty_print_stream_chunk(chunk) # for debugging
+        chunks.update(chunk)
+
+        
+
+    # Extract the agent node message content safely
+    node_name = "agent"
+    agent_node = chunks.get(node_name)
     if not agent_node or "messages" not in agent_node or not agent_node["messages"]:
-        raise RuntimeError("No agent messages found in the response chunk.")
+        raise RuntimeError(f"No {node_name} messages found in the response chunk.")
 
     # last_msg should be a BaseMessage
     last_msg = agent_node["messages"][-1]
@@ -350,8 +355,6 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str) -> str:
 
 logging.info("chat_with_agent function created.")
 
-
-
-
-if __name__ == '__main__':
-    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")
+# # for testing
+# if __name__ == '__main__':
+#     chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")
