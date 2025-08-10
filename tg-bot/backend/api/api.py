@@ -1,15 +1,17 @@
 import os
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, logger
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from langgraph_agent import chat_with_agent
 
 # Load environment variables
 load_dotenv()
 
 # Setup logging
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -19,8 +21,8 @@ logging.basicConfig(
     ],
     force=True  # This overrides any prior logging config
 )
-logger = logging.getLogger(__name__)
 
+logging.getLogger().info("Logging is set up.")
 
 
 # FastAPI app
@@ -39,10 +41,8 @@ app = FastAPI(
 #     allow_headers=["*"],
 # )
 
-API_TOKEN = os.getenv("API_TOKEN")  # Optional: for authentication
-
-
-print("API Token:", API_TOKEN)
+API_TOKEN = os.getenv("API_TOKEN")
+REQUIRE_API_TOKEN = os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true"
 
 # Request model
 class PromptRequest(BaseModel):
@@ -53,69 +53,42 @@ class PromptRequest(BaseModel):
 @app.post("/generate")
 async def generate_text(
     request: PromptRequest,
-    authorization: str = Header(None)
+    authorization: str | None = Header(default=None)
 ):
-    """
-    Generate a response from the LLM agent using the provided prompt, user_id, and thread_id.
-    Requires API key authentication if enabled.
-    """
-    logger.info(f"Incoming /generate request | user_id={request.user_id} thread_id={request.thread_id}")
+    print("Endpoint /generate called") 
+    logging.info(f"Incoming /generate request payload: {request.model_dump_json()}") 
+    # logging.info(f"Incoming /generate request | user_id={request.user_id} thread_id={request.thread_id}")
 
-    # API key check (optional, controlled by REQUIRE_API_TOKEN)
-    if os.getenv("REQUIRE_API_TOKEN", "false").lower() == "true":
-        api_token_env = os.getenv("API_TOKEN")
-
-        # No Authorization header
+    if REQUIRE_API_TOKEN:
         if not authorization:
-            logger.warning("Unauthorized request: Missing Authorization header")
-            raise HTTPException(
-                status_code=401,
-                detail="You must provide an API token in the Authorization header."
-            )
-
-        # Wrong format
+            logging.warning("Unauthorized: Missing Authorization header")
+            raise HTTPException(status_code=401, detail="You must provide an API token in the Authorization header.")
+        
         if not authorization.startswith("Bearer "):
-            logger.warning("Unauthorized request: Invalid Authorization header format")
-            raise HTTPException(
-                status_code=400,
-                detail="Authorization header must be in format: Bearer <API_TOKEN>."
-            )
+            logging.warning("Unauthorized: Invalid Authorization header format")
+            raise HTTPException(status_code=400, detail="Authorization header must be in format: Bearer <API_TOKEN>.")
 
-        # Extract and validate token
-        provided_token = authorization.split("Bearer ")[1].strip()
-        if provided_token != api_token_env:
-            logger.warning("Unauthorized request: Invalid API token")
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid API token. Please provide the correct one."
-            )
+        token = authorization.removeprefix("Bearer ").strip()
+        if token != API_TOKEN:
+            logging.warning("Unauthorized: Invalid API token")
+            raise HTTPException(status_code=403, detail="Invalid API token. Please provide the correct one.")
 
     try:
-        from langgraph_agent import chat_with_agent
         generated_text = chat_with_agent(request.prompt, request.user_id, request.thread_id)
-        logger.info("Generated text successfully")
+        logging.info("Generated text successfully")
         return {"generated_text": generated_text}
 
     except Exception as e:
-        logger.exception("Error in /generate endpoint")
+        logging.exception("Error in /generate endpoint")
         raise HTTPException(status_code=500, detail=str(e))
-
-# @app.post("/generate")
-# async def generate_text(request: PromptRequest):
-#     return {"generated_text": f"Echo: {request.prompt}"}
-
 
 @app.get("/health")
 async def health_check():
-    """
-    Simple health check endpoint.
-    """
     return {"status": "ok"}
 
 @app.get("/")
 def read_root():
     return {"Hello": "This is the root of the API"}
-
 
 if __name__ == "__main__":
     uvicorn.run('api:app', host="0.0.0.0", port=8000, reload=True)

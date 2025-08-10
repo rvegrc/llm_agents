@@ -78,8 +78,8 @@ embeddings = OllamaEmbeddings(
 
 logging.info(f"Using embeddings model: {emb_model_name}")
 
-# LLM_MODEL_NAME='qwen3:0.6b'
-LLM_MODEL_NAME='qwen3:1.7b'
+LLM_MODEL_NAME='qwen3:0.6b'
+# LLM_MODEL_NAME='qwen3:1.7b'
 # LLM_MODEL_NAME='qwen3:4b'
 
 llm = ChatOpenAI(
@@ -156,7 +156,7 @@ prompt = ChatPromptTemplate.from_messages(
             Be attentive to subtle cues and underlying emotions. 
             Adapt your communication style to match the user's preferences, language and current emotional state. 
             If you use tools, call them internally and respond only after the tool operation 
-            completes successfully.
+            completes successfully. Respond only with language that is appropriate for the user.
         """),
 
         HumanMessagePromptTemplate.from_template("user question: {question}"),
