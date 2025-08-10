@@ -79,6 +79,7 @@ embeddings = OllamaEmbeddings(
 logging.info(f"Using embeddings model: {emb_model_name}")
 
 # LLM_MODEL_NAME='qwen3:0.6b'
+# LLM_MODEL_NAME='qwen3:1.7b'
 
 # llm = ChatOpenAI(
 #     model=LLM_MODEL_NAME,
@@ -91,11 +92,11 @@ logging.info(f"Using embeddings model: {emb_model_name}")
 from langchain.chat_models import init_chat_model
 
 llm = init_chat_model(
-    model="gpt-5-mini"
+    model="gpt-4.1-mini"
     ,model_provider="openai"
-    ,temperature=1
+    ,temperature=0.2
     # ,max_tokens=1000
-    # ,top_p=0.5
+    ,top_p=0.5
     )
 
 
@@ -104,7 +105,7 @@ logging.info(f"LLM  and embeddings initialized.")
 
 logging.info("Binding tools to LLM.")
 
-tools = [save_recall_memories, search_recall_memories, web_search_tool]
+tools = [search_recall_memories, web_search_tool]
 llm_with_tools = llm.bind_tools(tools)
 
 logging.info("Tools bound to LLM.")
@@ -151,7 +152,7 @@ prompt = ChatPromptTemplate.from_messages(
             Do not explicitly mention your memory or retrieval capabilities. 
             Instead, seamlessly integrate them into your responses. 
             Be attentive to subtle cues and underlying emotions. 
-            Adapt your communication style to match the user's preferences and current emotional state. 
+            Adapt your communication style to match the user's preferences, language and current emotional state. 
             If you use tools, call them internally and respond only after the tool operation 
             completes successfully.
         """),
@@ -162,7 +163,18 @@ prompt = ChatPromptTemplate.from_messages(
 
 logging.info("Prompt template created.")
 
-logging.info("Create function for vector store for long-term memory...")
+logging.info("Initializing vector store for recall memories...")
+
+recall_memories = vectorstore_collection_init(
+    client_qd=client_qd,
+    collection_name='recall_memories',
+    embeddings=embeddings,
+    distance="Cosine"
+)
+logging.info("Vector store for recall memories initialized.")
+
+
+logging.info("Create function for load memories from vector store...")
 
 def load_memories(state: State, config: RunnableConfig) -> State:
     """Load memories for the current conversation.
@@ -188,16 +200,17 @@ def load_memories(state: State, config: RunnableConfig) -> State:
 
 logging.info("Function for loading memories created.")
 
+
 logging.info("Creating the agent and routing...")
 
-# def clean_response(response: str) -> str:
-#     """Remove any internal thinking tags from the response."""
-#     import re
-#     # Remove <think>...</think> blocks
-#     response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-#     # Remove any other XML tags
-#     response = re.sub(r'<\/?[a-z_]+>', '', response)
-#     return response.strip()
+def clean_response(response: str) -> str:
+    """Remove any internal thinking tags from the response."""
+    import re
+    # Remove <think>...</think> blocks
+    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    # # Remove any other XML tags
+    # response = re.sub(r'<\/?[a-z_]+>', '', response)
+    return response.strip()
 
 # def format_recall_memory(messages: list) -> str:
 #     """Format relevant messages for recall memory."""
@@ -235,40 +248,58 @@ def agent(state: State) -> State:
     recall_str = (
         "<recall_memory>\n" + "\n".join(str(m) for m in state["messages"]) + "\n</recall_memory>"
     )
-
-      
+    
 
     prediction = bound.invoke({
         "question": state["question"].content,
         "recall_memories": recall_str
     })['messages'][-1]
 
-    # if hasattr(prediction, 'content'):
-    #     prediction.content = clean_response(prediction.content)
+    if hasattr(prediction, 'content'):
+        prediction.content = clean_response(prediction.content)
 
     return State(
         messages=state["messages"] + [prediction],
         question=state["question"]
     )
 
+logging.info("Agent created.")
 
 
-logging.info("Agent and routing created.")
+logging.info("Creating function for saving user interaction...")
 
-logging.info("Building the agent graph...")
+def save_user_interaction(state: State, config: RunnableConfig) -> None:
+    user_input = state["question"].content
+    assistant_output = state["messages"][-1].content
+    memory = f'''{{
+        user_question: {user_input},
+        assistant_output: {assistant_output}
+    }}'''
+
+    save_recall_memories(memory, config)
+
+    return state
+
+
+logging.info("Function for saving user interaction created.")
+
+
+logging.info("Building the graph...")
 
 def build_agent():
     builder = StateGraph(State)
 
     builder.add_node(load_memories)
     builder.add_node(agent)
+    builder.add_node(save_user_interaction)
     # builder.add_node("tools", ToolNode(tools)) # llm with tools does it
 
     builder.add_edge(START, "load_memories")
     builder.add_edge("load_memories", "agent")
     # builder.add_conditional_edges("agent", route_tools, ["tools", END]) # llm with tools does it
     # builder.add_edge("tools", "agent")
-    builder.add_edge("agent", END)
+    builder.add_edge("agent", "save_user_interaction")
+    builder.add_edge("save_user_interaction", END)
 
     memory = InMemorySaver()
   
@@ -276,7 +307,7 @@ def build_agent():
 
 graph = build_agent()
 
-logging.info("Agent graph built.")
+logging.info("Graph built.")
 
 logging.info("Creating pretty print function...")
 
@@ -293,7 +324,7 @@ def pretty_print_stream_chunk(chunk):
             print(updates)
 
         print("\n")
-
+        
 logging.info("Pretty print function created.")
 
 logging.info("Creating chat_with_agent function...")
@@ -302,22 +333,25 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str) -> str:
     """Send a user input string to the agent and return the agent's final response."""
     config = {"configurable": {"user_id": user_id, "thread_id": thread_id}}
     
-
     final_chunk = None
     for chunk in graph.stream({'question': HumanMessage(content=user_input)}, config=config):
         pretty_print_stream_chunk(chunk)
         final_chunk = chunk
 
     # Extract the last agent message content safely
-    agent_node = final_chunk.get("agent")
+    agent_node = final_chunk.get("save_user_interaction")
     if not agent_node or "messages" not in agent_node or not agent_node["messages"]:
         raise RuntimeError("No agent messages found in the response chunk.")
 
-    last_msg = agent_node["messages"][-1]
     # last_msg should be a BaseMessage
+    last_msg = agent_node["messages"][-1]
+
     return last_msg.content
 
 logging.info("chat_with_agent function created.")
 
+
+
+
 if __name__ == '__main__':
-    chat_with_agent("What is the weather in Beijing today?", "user_123", "thread_456")
+    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")
