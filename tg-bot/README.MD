@@ -1,38 +1,25 @@
-tg-bot/
- api/
-    app.py
-    Dockerfile
-    requirements.txt
- bot/
-    bot.py
-    Dockerfile
-    requirements.txt
- vector_store/
-    qdrant_data/
- models/
-    Qwen2.5-0.5B/
-    Qwen2.5-7B-Instruct/
-    multilingual-e5-large-instruct/
-    Qwen3-Embedding-0.6B/
+## Описание проекта
 
-   
- docker-compose.yml
- .env
+**tg-bot** — это мультикомпонентный проект для работы с LLM-агентами, генерацией текста, эмбеддингами и интеграцией с Telegram-ботом. Проект включает backend-сервисы, frontend-бота, хранение данных  и запрос данных из RAG, а также jupiter ноутбуки для разработки и тестирования.
 
- text gen:
-  - https://huggingface.co/unsloth/Qwen2.5-0.5B
-  - https://huggingface.co/Qwen/Qwen3-0.6B
-  - https://huggingface.co/unsloth/Qwen2.5-7B-Instruct
-  - https://huggingface.co/openai/gpt-oss-20b
-  - https://huggingface.co/Vikhrmodels/Vikhr-Qwen-2.5-0.5B-instruct-GGUF
+### Основные компоненты:
 
- embeddings:
-  - from https://huggingface.co/spaces/mteb/leaderboard
-    - https://huggingface.co/intfloat/multilingual-e5-large-instruct
-    - https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+- **backend/** — серверная часть, реализующая API, обработку запросов, работу с LLM и памятью, хранение данных и векторных представлений.
+- **frontend/bot/** — Telegram-бот, взаимодействующий с пользователем.
+- **dev/** — Jupyter-ноутбуки и вспомогательные скрипты для тестирования и разработки.
+- **docker-compose.yaml, .env** — файлы для запуска и конфигурации всех сервисов.
 
+### Документация
 
-```scss
+[Использование переменных окружения](./doc/env.md)
+
+[Использование API](./doc/api.md)
+
+[Загрузка новых моделей](./doc/llm.md)
+
+### Структура проекта
+
+```text
 tg-bot/
 ├── .env
 ├── docker-compose.yaml
@@ -71,29 +58,10 @@ tg-bot/
 │   ├── rag_tool.ipynb
 │   └── search_tool.ipynb
 └── frontend/
-    ├── bot/
-    │   ├── .env
-    │   ├── bot.py
-    │   ├── Dockerfile
-    │   └── requirements.txt
-    └── data/
-        └── open-webui/
-            ├── webui.db
-            └── cache/
-                ├── audio/
-                │   └── speech/
-                ├── embedding/
-                │   └── models/
-                │       ├── .locks/
-                │       │   └── models--sentence-transformers--all-MiniLM-L6-v2/
-                │       │       ├── ... (lock files)
-                │       ├── models--sentence-transformers--all-MiniLM-L6-v2/
-                │       │   ├── blobs/
-                │       │   ├── refs/
-                │       │   └── snapshots/
-                │       └── xet/
-                │           └── https___cas_serv-tGqkUaZf_CBPHQ6h/
-                └── image/
-                    └── generations/
-            └── uploads/
+   └── bot/
+       ├── .env
+       ├── bot.py
+       ├── Dockerfile
+       └── requirements.txt
+    
 ```

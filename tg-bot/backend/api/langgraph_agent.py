@@ -49,7 +49,7 @@ from tools.web_search import web_search_tool
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")
-# LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 
 logging.info("Modules and Environment variables loaded.")
 logging.info("Initializing Qdrant client.")
@@ -78,9 +78,6 @@ embeddings = OllamaEmbeddings(
 
 logging.info(f"Using embeddings model: {emb_model_name}")
 
-LLM_MODEL_NAME='qwen3:0.6b'
-# LLM_MODEL_NAME='qwen3:1.7b'
-# LLM_MODEL_NAME='qwen3:4b'
 
 llm = ChatOpenAI(
     model=LLM_MODEL_NAME,

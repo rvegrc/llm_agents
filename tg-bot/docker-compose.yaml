@@ -52,42 +52,18 @@ services:
       - llmnet
 
   # FRONTEND
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
-    container_name: open-webui-agents
-    volumes:
-      - ./frontend/data/open-webui:/app/backend/data
+
+  bot:
+    build: ./frontend/bot
+    container_name: tg-bot
     depends_on:
-      - ollama
-      - qdrant
-    ports:
-      - ${OPEN_WEBUI_PORT-3001}:8080
+      - api
     env_file:
-      - ./backend/api/.env
-      # - OLLAMA_BASE_URL=
-      # - WEBUI_SECRET_KEY=
-      # - VECTOR_DB=
-      # - QDRANT_URI=
-      # - QDRANT_API_KEY=your_api_key_here   # only if you use api key auth
-    # environment:
-    #   - QDRANT_URI=${QDRANT_URL}
-    #   - VECTOR_DB=${VECTOR_DB}
-    restart: unless-stopped
+      - ./frontend/bot/.env
+    volumes:
+      - ./frontend/bot:/app
     networks:
-      - llmnet 
-
-
-  # bot:
-  #   build: ./frontend/bot
-  #   container_name: tg-bot
-  #   depends_on:
-  #     - api
-  #   env_file:
-  #     - ./frontend/bot/.env
-  #   volumes:
-  #     - ./frontend/bot:/app
-  #   networks:
-  #     - llmnet
+      - llmnet
 
 volumes:
   ollama_data: {}
