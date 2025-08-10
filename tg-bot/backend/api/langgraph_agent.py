@@ -79,8 +79,8 @@ embeddings = OllamaEmbeddings(
 logging.info(f"Using embeddings model: {emb_model_name}")
 
 # LLM_MODEL_NAME='qwen3:0.6b'
-# LLM_MODEL_NAME='qwen3:1.7b'
-LLM_MODEL_NAME='deepseek-r1:1.5b'
+LLM_MODEL_NAME='qwen3:1.7b'
+# LLM_MODEL_NAME='qwen3:4b'
 
 llm = ChatOpenAI(
     model=LLM_MODEL_NAME,
