@@ -153,7 +153,7 @@ prompt = ChatPromptTemplate.from_messages(
             Be attentive to subtle cues and underlying emotions. 
             Adapt your communication style to match the user's preferences, language and current emotional state. 
             If you use tools, call them internally and respond only after the tool operation 
-            completes successfully. Respond only with language that is appropriate for the user.
+            completes successfully. Respond only with russian language.
         """),
 
         HumanMessagePromptTemplate.from_template("user question: {question}"),

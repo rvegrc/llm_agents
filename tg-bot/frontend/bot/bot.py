@@ -23,6 +23,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
 
+
 # Validate required environment variables early
 if not all([BOT_TOKEN, API_URL, API_TOKEN]):
     logger.error("Missing required environment variables BOT_TOKEN, API_URL or API_TOKEN")
@@ -31,24 +32,33 @@ if not all([BOT_TOKEN, API_URL, API_TOKEN]):
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-async def check_api_connection() -> bool:
-    """Check if API is reachable and token is valid."""
+#  Healthchek  API
+
+async def check_api_connection(retries: int = 20, delay: int = 5) -> bool:
+    """Check if API is reachable and token is valid, retrying if needed."""
     health_url = f"{API_URL}/health" if not API_URL.endswith("/health") else API_URL
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(health_url, timeout=5) as resp:
-                if resp.status == 200:
-                    logger.info("API connection test successful")
-                    return True
-                logger.error(f"API connection test failed with status: {resp.status}")
-                return False
-    except aiohttp.ClientError as e:
-        logger.error(f"API connection error: {str(e)}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected API test error: {str(e)}")
-        return False
+    for attempt in range(1, retries + 1):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(health_url, timeout=5) as resp:
+                    if resp.status == 200:
+                        logger.info("API connection test successful")
+                        return True
+                    else:
+                        logger.error(f"API connection test failed with status: {resp.status}")
+        except aiohttp.ClientError as e:
+            logger.error(f"[Attempt {attempt}/{retries}] Connection failed to {health_url}: {str(e)}")
+        except asyncio.TimeoutError:
+            logger.error(f"[Attempt {attempt}/{retries}] Timeout while connecting to API at {health_url}")
+        except Exception as e:
+            logger.error(f"[Attempt {attempt}/{retries}] Unexpected API test error: {str(e)}")
+
+        logger.info(f"Waiting {delay} seconds before retrying...")
+        await asyncio.sleep(delay)
+
+    logger.critical(f"API did not become available after {retries} attempts.")
+    return False
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
