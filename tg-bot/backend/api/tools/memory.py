@@ -33,8 +33,6 @@ from .rag import vectorstore_collection_init
 import os
 import requests
 
-# Initialize LangSmith project
-os.environ["LANGSMITH_PROJECT"] = 'tg-bot'
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")

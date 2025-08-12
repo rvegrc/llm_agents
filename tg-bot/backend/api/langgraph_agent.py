@@ -84,7 +84,7 @@ llm = ChatOpenAI(
     openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
     api_key="EMPTY",  # required by LangChain, but not used by Ollama
     temperature=0.2,
-    max_tokens=200
+    max_tokens=1000
 )
 
 # for testing
@@ -355,26 +355,18 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str) -> str:
     """Send a user input string to the agent and return the agent's final response."""
     config = {"configurable": {"user_id": user_id, "thread_id": thread_id}}
 
-    chunks = {}
+    # for debugging
     for chunk in graph.stream({'question': HumanMessage(content=user_input)}, config=config):
-        pretty_print_stream_chunk(chunk) # for debugging
-        chunks.update(chunk)
+        pretty_print_stream_chunk(chunk)
 
-        
-
-    # Extract the agent node message content safely
-    node_name = "agent"
-    agent_node = chunks.get(node_name)
-    if not agent_node or "messages" not in agent_node or not agent_node["messages"]:
-        raise RuntimeError(f"No {node_name} messages found in the response chunk.")
-
+    
     # last_msg should be a BaseMessage
-    last_msg = agent_node["messages"][-1]
+    last_msg = chunk['save_user_interaction']["messages"][-1]
 
     return last_msg.content
 
 logging.info("chat_with_agent function created.")
 
-# # for testing
-# if __name__ == '__main__':
-#     chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")
+# for testing
+if __name__ == '__main__':
+    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")

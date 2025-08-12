@@ -17,4 +17,4 @@ sentence_transformers
 # llama-cpp-python
 langchain_ollama
 langchain_openai
-
+langchain_deepseek

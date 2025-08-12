@@ -1,23 +1,23 @@
 services:
   
   # BACKEND
-  ollama:
-    # image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
-    image: ollama/ollama:0.11.4
-    container_name: ollama-agents
-    volumes:
-      - ./backend/data/ollama_data:/root/.ollama
-      - ../../models/:/custom/models
-    environment:
-      - OLLAMA_MODELS=/custom/models
-      - OLLAMA_SERVER_HOST=0.0.0.0
-    ports:
-      - "11434:11434"
-    pull_policy: always
-    tty: true
-    restart: unless-stopped
-    networks:
-      - llmnet 
+  # ollama:
+  #   # image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+  #   image: ollama/ollama:0.11.4
+  #   container_name: ollama-agents
+  #   volumes:
+  #     - ./backend/data/ollama_data:/root/.ollama
+  #     - ../../models/:/custom/models
+  #   environment:
+  #     - OLLAMA_MODELS=/custom/models
+  #     - OLLAMA_SERVER_HOST=0.0.0.0
+  #   ports:
+  #     - "11434:11434"
+  #   pull_policy: always
+  #   tty: true
+  #   restart: unless-stopped
+  #   networks:
+  #     - llmnet 
 
   # for production use TLS and generating JSON Web Tokens
   qdrant:
@@ -36,8 +36,8 @@ services:
   api:
     build: ./backend/api
     container_name: api-agents
-    depends_on:
-      - ollama
+    # depends_on:
+    #   - ollama
     ports:
       - "8000:8000"
     env_file:
