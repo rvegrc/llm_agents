@@ -25,8 +25,9 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, FunctionMessage, ToolMessage
 from langchain_openai import ChatOpenAI
-from langchain_ollama import OllamaEmbeddings
+from langchain_ollama import OllamaEmbeddings, ChatOllama
 from qdrant_client import QdrantClient
+from langchain_deepseek import ChatDeepSeek
 
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import  END, START, MessagesState, StateGraph
@@ -64,7 +65,7 @@ class State(MessagesState):
     messages: Optional[List[BaseMessage]] = None
     
 
-logging.info("LLM and embeddings initializing.")
+logging.info("Embeddings initializing.")
 
 # emb_model_name = '/models/multilingual-e5-large-instruct'
 # embeddings = HuggingFaceEmbeddings(model_name=emb_model_name)
@@ -79,12 +80,21 @@ embeddings = OllamaEmbeddings(
 logging.info(f"Using embeddings model: {emb_model_name}")
 
 
-llm = ChatOpenAI(
+# llm = ChatOpenAI(
+#     model=LLM_MODEL_NAME,
+#     openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
+#     api_key="EMPTY",  # required by LangChain, but not used by Ollama
+#     temperature=0.2,
+#     max_tokens=1000
+# )
+
+llm = ChatOllama(
     model=LLM_MODEL_NAME,
-    openai_api_base=f'{LLM_API_SERVER_URL}/v1', # for compatibility with OpenAI
-    api_key="EMPTY",  # required by LangChain, but not used by Ollama
-    temperature=0.2,
-    max_tokens=1000
+    base_url=f'{LLM_API_SERVER_URL}',
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
 )
 
 # for testing
@@ -98,9 +108,7 @@ llm = ChatOpenAI(
 #     ,top_p=0.5
 #     )
 
-
-
-logging.info(f"LLM  and embeddings initialized.")
+logging.info(f"Using LLM: {LLM_MODEL_NAME}")
 
 logging.info("Binding tools to LLM.")
 
