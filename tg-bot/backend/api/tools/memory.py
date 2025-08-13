@@ -36,7 +36,6 @@ import requests
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 
 logging.info("Modules and Environment variables loaded.")
 logging.info("Initializing Qdrant client.")

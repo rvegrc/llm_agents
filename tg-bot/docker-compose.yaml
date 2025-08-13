@@ -44,12 +44,14 @@ services:
       - ./backend/api/.env
     volumes:
       - ./backend/api:/app
-      - ../../models:/models
+      # - ../../models:/models
     deploy:
       resources:
         limits:
           cpus: '2'
           memory: 2G
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
      - llmnet
 
