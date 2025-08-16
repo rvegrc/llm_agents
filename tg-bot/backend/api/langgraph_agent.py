@@ -51,6 +51,7 @@ from tools.web_search import web_search_tool
 QDRANT_URL = os.getenv("QDRANT_URL")
 LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
+JUDGE_MODEL_NAME = os.getenv("JUDGE_MODEL_NAME")
 
 logging.info("Modules and Environment variables loaded.")
 logging.info("Initializing Qdrant client.")
@@ -91,7 +92,16 @@ logging.info(f"Using embeddings model: {emb_model_name}")
 llm = ChatOllama(
     model=LLM_MODEL_NAME,
     base_url=f'{LLM_API_SERVER_URL}',
-    temperature=0,
+    temperature=0.5,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
+judge_llm = ChatOllama(
+    model=JUDGE_MODEL_NAME,
+    base_url=f'{LLM_API_SERVER_URL}',
+    temperature=0.5,
     max_tokens=None,
     timeout=None,
     max_retries=2,
@@ -286,7 +296,44 @@ def agent(state: State) -> State:
 logging.info("Agent created.")
 
 
+logging.info("Creating function for judging agent output...")
+
+def judge(state: State) -> State:
+    """Ask an LLM judge to evaluate agent_output"""
+
+    user_input = state["question"].content
+    assistant_output = state["messages"][-1].content
+
+    eval_prompt = f"""
+    You are a strict judge. Evaluate if the following agent answer is correct, useful, and safe. 
+    Respond 'TRUE' if acceptable, 'FALSE' if not and provide a description with justification.
+
+    User input: {user_input}
+    Agent output: {assistant_output}
+    """
+
+    resp = judge_llm.invoke(eval_prompt)
+    answer = resp.content.strip()
+
+    is_valid = answer.startswith("TRUE")
+    not_valid = answer.startswith("FALSE")
+    # judged_output = assistant_output if is_valid else not_valid
+
+    return {**state, 'is_valid': is_valid, 'not_valid': not_valid}
+
+logging.info("Function for judging agent output created.")
+
+
+logging.info("Add decision-making routing.")
+
+def route_decision(state: State) -> str:
+    """Determine the next node based on the state."""
+    if state.get("is_valid"):
+        return state
+    return {**state, "not_valid": state.get("not_valid")}
+
 logging.info("Creating function for saving user interaction...")
+
 
 def save_user_interaction(state: State, config: RunnableConfig) -> None:
     """Save the user interaction to recall memories.
@@ -328,7 +375,10 @@ def build_agent():
     builder.add_edge("load_memories", "agent")
     # builder.add_conditional_edges("agent", route_tools, ["tools", END]) # llm with tools does it
     # builder.add_edge("tools", "agent")
-    builder.add_edge("agent", "save_user_interaction")
+    # builder.add_edge("agent", "save_user_interaction")
+    builder.add_edge("agent", "judge")
+    builder.add_conditional_edges("judge", route_decision, ["agent", "save_user_interaction"])
+    builder.add_node('judge')
     builder.add_edge("save_user_interaction", END)
 
     memory = InMemorySaver()
