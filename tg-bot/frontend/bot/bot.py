@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timezone
 import os
 import logging
 from aiogram import Bot, Dispatcher, types
@@ -70,8 +71,19 @@ async def start_command(message: types.Message):
 async def handle_message(message: types.Message):
     """Handle user messages."""
     user_id = message.from_user.id
-    thread_id = message.message_thread_id or message.message_id
-    logger.info(f"Received message from user {user_id}: {message.text}")
+    chat_id = message.chat.id
+
+    # Determine thread ID
+    if hasattr(message, "message_thread_id") and message.message_thread_id:
+        # Forum thread (topic) exists
+        thread_id = f"forum_{message.message_thread_id}"
+    else:
+        # Normal chat → consistent per user
+        thread_id = f"chat_{chat_id}_{user_id}"
+
+     # created_at in ISO8601 UTC
+    created_at = message.date.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    logger.info(f"created_at: {created_at} Received message from user {user_id}: {message.text}")
 
     headers = {
         "Authorization": f"Bearer {API_TOKEN}",
@@ -80,7 +92,8 @@ async def handle_message(message: types.Message):
     payload = {
         "prompt": message.text,
         "user_id": str(user_id),
-        "thread_id": str(thread_id)
+        "thread_id": str(thread_id),
+        "created_at": str(created_at)
     }
 
     try:

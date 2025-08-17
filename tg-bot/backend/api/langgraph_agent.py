@@ -455,16 +455,16 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str, created_at: s
 logging.info("chat_with_agent function created.")
 
 # for testing
-if __name__ == '__main__':
-    now = datetime.now(timezone.utc)
-    # ISO8601 string with dynamic Z if UTC
-    if now.tzinfo == timezone.utc:
-        created_at_iso = now.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    else:
-        # For non-UTC, include offset like +02:00
-        created_at_iso = now.isoformat(timespec="seconds")
+# if __name__ == '__main__':
+#     now = datetime.now(timezone.utc)
+#     # ISO8601 string with dynamic Z if UTC
+#     if now.tzinfo == timezone.utc:
+#         created_at_iso = now.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+#     else:
+#         # For non-UTC, include offset like +02:00
+#         created_at_iso = now.isoformat(timespec="seconds")
 
-    created_at = now.strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
-    # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
-    # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
-    chat_with_agent("А завтра?", "user_123", "thread_456", created_at)
+#     created_at = now.strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
+#     # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+#     # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+#     chat_with_agent("А завтра?", "user_123", "thread_456", created_at)

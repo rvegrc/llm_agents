@@ -49,6 +49,7 @@ class PromptRequest(BaseModel):
     prompt: str
     user_id: str
     thread_id: str
+    created_at: str
 
 @app.post("/generate")
 async def generate_text(
@@ -74,7 +75,7 @@ async def generate_text(
             raise HTTPException(status_code=403, detail="Invalid API token. Please provide the correct one.")
 
     try:
-        generated_text = chat_with_agent(request.prompt, request.user_id, request.thread_id)
+        generated_text = chat_with_agent(request.prompt, request.user_id, request.thread_id, request.created_at)
         logging.info("Generated text successfully")
         return {"generated_text": generated_text}
 
