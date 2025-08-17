@@ -18,7 +18,7 @@ logging.info("Importing necessary modules for the application and load environme
 
 from langchain_core.runnables import RunnableLambda
 from fastapi import FastAPI, requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from langchain_core.messages import get_buffer_string
 from langchain_core.runnables import RunnableConfig
@@ -55,6 +55,8 @@ LLM_API_SERVER_URL = os.getenv("LLM_API_SERVER_URL")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
 JUDGE_MODEL_NAME = os.getenv("JUDGE_MODEL_NAME")
 
+MAX_RETRIES = int(os.getenv("MAX_RETRIES"))  # how many times we allow reflection
+
 logging.info("Modules and Environment variables loaded.")
 logging.info("Initializing Qdrant client.")
 
@@ -68,7 +70,7 @@ class State(MessagesState):
     messages: Optional[List[BaseMessage]] = None
     is_valid: Optional[str] = None
     judge_feedback: Optional[str] = None
-    
+    retry_count: Optional[int]  # Track how many times reflection was attempted
 
 logging.info("Embeddings initializing.")
 
@@ -157,7 +159,12 @@ prompt = ChatPromptTemplate.from_messages(
             
             Recall memories are contextually retrieved based on the current conversation:
             {recall_memories}
-            
+
+            ## JUDGE FEEDBACK
+
+            Judge feedback is provided by the LLM to evaluate the quality of responses from last interactions:
+            {{judge_feedback}}
+
             ## RAG USAGE GUIDELINES
             
             Use RAG when you need up-to-date, domain-specific, or context-specific information
@@ -235,8 +242,8 @@ def load_memories(state: State, config: RunnableConfig) -> State:
 
     # Return updated state with the loaded memories added to the messages
     return State(
-        messages=messages,
-        question=state["question"]
+        question=state["question"],
+        messages=messages        
     )
 
 logging.info("Function for loading memories created.")
@@ -290,24 +297,30 @@ def agent(state: State) -> State:
         "<recall_memory>\n" + "\n".join(str(m) for m in state["messages"]) + "\n</recall_memory>"
     )
 
+  
     # Inject judge feedback if it exists
     feedback = state.get("judge_feedback")
     if feedback:
-        recall_str += f"\n<judge_feedback>\nThe previous answer was judged incorrect or unsafe.\n" \
-                      f"Feedback: {feedback}\n</judge_feedback>"
+        judge_feedback = f"<judge_feedback>\nThe previous answer was judged incorrect or unsafe.\nFeedback: {feedback}\n</judge_feedback>"
+    else:
+        judge_feedback = "The previous answer was acceptable or it is first time to provide feedback."
+
+    print(f'agent judge feedback: {judge_feedback}')
     
 
     prediction = bound.invoke({
+        "judge_feedback": judge_feedback,
         "question": state["question"].content,
-        "recall_memories": recall_str
+        "recall_memories": recall_str,        
     })['messages'][-1]
 
     if hasattr(prediction, 'content'):
         prediction.content = clean_response(prediction.content)
 
+    
     return State(
-        messages=state["messages"] + [prediction],
         question=state["question"],
+        messages=state["messages"] + [prediction],
         judge_feedback=None  # reset after using it
     )
 
@@ -347,31 +360,47 @@ def judge(state: State) -> State:
     # print(f"Is valid: {is_valid}")
     # print(f"Not valid: {not_valid}")
     # print(f"Judge feedback: {feedback}")
-   
+
+    # set attr retry_count if not exists
+    if "retry_count" not in state:
+        state["retry_count"] = 0
 
     return State(
-        messages=state["messages"],
-        question=state["question"],
+        question=state["question"],        
+        messages=state["messages"],        
         is_valid=is_valid,
-        judge_feedback=feedback
+        judge_feedback=feedback,
+        retry_count=state["retry_count"]
     )
 
 
 
 logging.info("Function for judging agent output created.")
 
-
-logging.info("Add decision-making routing.")
+logging.info("Creating decision-making routing...")
 
 def route_decision(state: State) -> str:
     """Determine the next node based on the state."""
 
-    print(state)
+    # print(f"Current state: {state}")
 
-    if state['is_valid'] == True:
-        return 'save_user_interaction'
-    else:
-        return 'agent'
+    retry_count = state["retry_count"]
+
+    print(f"Current state: valid={state['is_valid']}, retries={retry_count}")
+
+    if state['is_valid']:
+        # Answer is fine → end flow
+        return "save_user_interaction"
+
+    # If invalid but retries remain → retry agent
+    if retry_count < MAX_RETRIES:
+        state['retry_count'] = retry_count + 1
+        print(f"Retrying agent (attempt {state['retry_count']}/{MAX_RETRIES})")
+        return "agent"
+
+    # Out of retries → stop and log feedback
+    print(f"Max retries reached. Judge feedback: {state['judge_feedback']}")
+    return "save_user_interaction"
 
 logging.info("Creating function for saving user interaction...")
 
@@ -403,6 +432,8 @@ logging.info("Function for saving user interaction created.")
 
 
 logging.info("Building the graph...")
+
+
 
 def build_agent():
     builder = StateGraph(State)
