@@ -23,6 +23,8 @@ from langchain_core.runnables import RunnableConfig
 
 from qdrant_client import QdrantClient, models
 
+from datetime import datetime, timedelta, timezone
+
 # from dotenv import load_dotenv
 # load_dotenv()
 
@@ -70,12 +72,15 @@ recall_memories = vectorstore_collection_init(
 def get_user_thread_id(config: RunnableConfig) -> str:
     user_id = config["configurable"].get("user_id")
     thread_id = config["configurable"].get("thread_id")
+    created_at = config["configurable"].get("created_at")
     if user_id is None:
         raise ValueError("User ID needs to be provided to save a memory.")
     if thread_id is None:
         raise ValueError("Thread ID needs to be provided to save a memory.")
+    if created_at is None:
+        raise ValueError("Message created at needs to be provided to save a memory.")
 
-    return user_id, thread_id
+    return user_id, thread_id, created_at
 
 
 
@@ -84,10 +89,15 @@ def save_recall_memories(
         config: RunnableConfig       
         ) -> str:
     """Save recall memory to vectorstore for later semantic retrieval."""
-    user_id, thread_id = get_user_thread_id(config)
+    user_id, thread_id, created_at = get_user_thread_id(config)
+    # current timestamp
     document = Document(
         page_content=memory,
-        metadata={"user_id": user_id, 'thread_id': thread_id}
+        metadata={
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "created_at": created_at
+        }
     )
     recall_memories.add_documents([document])
     return memory
@@ -99,7 +109,7 @@ def search_recall_memories(
     ) -> List[str]:
     """Search for relevant recall memories."""
 
-    user_id, thread_id = get_user_thread_id(config)
+    user_id, thread_id, created_at = get_user_thread_id(config)
     
     # Filter by user_id and thread_id
     qdrant_filter = models.Filter(
@@ -112,6 +122,13 @@ def search_recall_memories(
                 key="metadata.thread_id",
                 match=models.MatchValue(value=thread_id),
             ),
+            # models.FieldCondition(
+            #     key="metadata.created_at",
+            #     range=models.Range(
+            #         gte=(datetime.fromisoformat(created_at) - timedelta(days=30)).isoformat(),
+            #         lte=datetime.fromisoformat(created_at).isoformat()
+            #     )
+            # )
         ]
     )
 
@@ -120,7 +137,12 @@ def search_recall_memories(
         k=3,
         filter=qdrant_filter,  # structured filter required by QdrantVectorStore
     )
+ 
 
-    return [doc.page_content for doc in documents]
 
+
+
+    # return [doc.page_content for doc in documents]
+    return  [f'created at: {doc.metadata.get("created_at")}:, content: {doc.page_content}'
+              for doc in documents]
 

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import logging
 
 logging.basicConfig(
@@ -64,6 +65,9 @@ logging.info("Qdrant client initialized.")
 class State(MessagesState):
     question: BaseMessage
     messages: Optional[List[BaseMessage]] = None
+    is_valid: Optional[str] = None
+    not_valid: Optional[str] = None
+    judge_feedback: Optional[str] = None
     
 
 logging.info("Embeddings initializing.")
@@ -172,6 +176,7 @@ prompt = ChatPromptTemplate.from_messages(
             Adapt your communication style to match the user's preferences, language and current emotional state. 
             If you use tools, call them internally and respond only after the tool operation 
             completes successfully. Respond only with language is appropriate the user question.
+            If user provides feedback, incorporate it into the conversation.
         """),
 
         HumanMessagePromptTemplate.from_template("user question: {question}"),
@@ -204,6 +209,12 @@ def load_memories(state: State, config: RunnableConfig) -> State:
         State: The updated state with loaded memories.
     """
     # Search for long-term memories in Qdrant
+    search_recall_memories_runnable = RunnableLambda(search_recall_memories)
+    recall_contents = search_recall_memories_runnable.invoke(
+        state["question"].content
+    )
+
+    # search last 3 memories in Qdrant
     search_recall_memories_runnable = RunnableLambda(search_recall_memories)
     recall_contents = search_recall_memories_runnable.invoke(
         state["question"].content
@@ -278,6 +289,12 @@ def agent(state: State) -> State:
     recall_str = (
         "<recall_memory>\n" + "\n".join(str(m) for m in state["messages"]) + "\n</recall_memory>"
     )
+
+    # Inject judge feedback if it exists
+    feedback = state.get("judge_feedback")
+    if feedback:
+        recall_str += f"\n<judge_feedback>\nThe previous answer was judged incorrect or unsafe.\n" \
+                      f"Feedback: {feedback}\n</judge_feedback>"
     
 
     prediction = bound.invoke({
@@ -290,7 +307,8 @@ def agent(state: State) -> State:
 
     return State(
         messages=state["messages"] + [prediction],
-        question=state["question"]
+        question=state["question"],
+        judge_feedback=None  # reset after using it
     )
 
 logging.info("Agent created.")
@@ -319,7 +337,18 @@ def judge(state: State) -> State:
     not_valid = answer.startswith("FALSE")
     # judged_output = assistant_output if is_valid else not_valid
 
-    return {**state, 'is_valid': is_valid, 'not_valid': not_valid}
+    # Store judge feedback (everything after TRUE/FALSE)
+    feedback = answer.replace("TRUE", "").replace("FALSE", "").strip()
+
+    return State(
+        messages=state.messages,
+        question=state.question,
+        is_valid=is_valid,
+        not_valid=not_valid,
+        judge_feedback=feedback
+    )
+
+
 
 logging.info("Function for judging agent output created.")
 
@@ -368,6 +397,7 @@ def build_agent():
 
     builder.add_node(load_memories)
     builder.add_node(agent)
+    builder.add_node(judge)
     builder.add_node(save_user_interaction)
     # builder.add_node("tools", ToolNode(tools)) # llm with tools does it
 
@@ -375,10 +405,9 @@ def build_agent():
     builder.add_edge("load_memories", "agent")
     # builder.add_conditional_edges("agent", route_tools, ["tools", END]) # llm with tools does it
     # builder.add_edge("tools", "agent")
-    # builder.add_edge("agent", "save_user_interaction")
-    builder.add_edge("agent", "judge")
-    builder.add_conditional_edges("judge", route_decision, ["agent", "save_user_interaction"])
-    builder.add_node('judge')
+    builder.add_edge("agent", "save_user_interaction")
+    # builder.add_edge("agent", "judge")
+    # builder.add_conditional_edges("judge", route_decision, ["agent", "save_user_interaction"])
     builder.add_edge("save_user_interaction", END)
 
     memory = InMemorySaver()
@@ -409,9 +438,9 @@ logging.info("Pretty print function created.")
 
 logging.info("Creating chat_with_agent function...")
 
-def chat_with_agent(user_input: str, user_id: str, thread_id: str) -> str:
+def chat_with_agent(user_input: str, user_id: str, thread_id: str, created_at: str) -> str:
     """Send a user input string to the agent and return the agent's final response."""
-    config = {"configurable": {"user_id": user_id, "thread_id": thread_id}}
+    config = {"configurable": {"user_id": user_id, "thread_id": thread_id, "created_at": created_at}}
 
     # for debugging
     for chunk in graph.stream({'question': HumanMessage(content=user_input)}, config=config):
@@ -427,4 +456,15 @@ logging.info("chat_with_agent function created.")
 
 # for testing
 if __name__ == '__main__':
-    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456")
+    now = datetime.now(timezone.utc)
+    # ISO8601 string with dynamic Z if UTC
+    if now.tzinfo == timezone.utc:
+        created_at_iso = now.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    else:
+        # For non-UTC, include offset like +02:00
+        created_at_iso = now.isoformat(timespec="seconds")
+
+    created_at = now.strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
+    # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+    # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+    chat_with_agent("А завтра?", "user_123", "thread_456", created_at)
