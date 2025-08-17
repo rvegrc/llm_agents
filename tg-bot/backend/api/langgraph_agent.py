@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import logging
+import re
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,7 +67,6 @@ class State(MessagesState):
     question: BaseMessage
     messages: Optional[List[BaseMessage]] = None
     is_valid: Optional[str] = None
-    not_valid: Optional[str] = None
     judge_feedback: Optional[str] = None
     
 
@@ -105,7 +105,7 @@ llm = ChatOllama(
 judge_llm = ChatOllama(
     model=JUDGE_MODEL_NAME,
     base_url=f'{LLM_API_SERVER_URL}',
-    temperature=0.5,
+    temperature=0.0,
     max_tokens=None,
     timeout=None,
     max_retries=2,
@@ -331,20 +331,28 @@ def judge(state: State) -> State:
     """
 
     resp = judge_llm.invoke(eval_prompt)
-    answer = resp.content.strip()
+    answer = re.sub(r'<think>.*?</think>\n\n', '', resp.content, flags=re.DOTALL)
 
     is_valid = answer.startswith("TRUE")
-    not_valid = answer.startswith("FALSE")
     # judged_output = assistant_output if is_valid else not_valid
 
     # Store judge feedback (everything after TRUE/FALSE)
     feedback = answer.replace("TRUE", "").replace("FALSE", "").strip()
 
+    # print(f'state: {state}')
+
+    # print(f'resp: {resp}')
+    # print(f'answer: {answer}')
+
+    # print(f"Is valid: {is_valid}")
+    # print(f"Not valid: {not_valid}")
+    # print(f"Judge feedback: {feedback}")
+   
+
     return State(
-        messages=state.messages,
-        question=state.question,
+        messages=state["messages"],
+        question=state["question"],
         is_valid=is_valid,
-        not_valid=not_valid,
         judge_feedback=feedback
     )
 
@@ -357,14 +365,18 @@ logging.info("Add decision-making routing.")
 
 def route_decision(state: State) -> str:
     """Determine the next node based on the state."""
-    if state.get("is_valid"):
-        return state
-    return {**state, "not_valid": state.get("not_valid")}
+
+    print(state)
+
+    if state['is_valid'] == True:
+        return 'save_user_interaction'
+    else:
+        return 'agent'
 
 logging.info("Creating function for saving user interaction...")
 
 
-def save_user_interaction(state: State, config: RunnableConfig) -> None:
+def save_user_interaction(state: State, config: RunnableConfig) -> State:
     """Save the user interaction to recall memories.
 
     Args:
@@ -378,8 +390,8 @@ def save_user_interaction(state: State, config: RunnableConfig) -> None:
     user_input = state["question"].content
     assistant_output = state["messages"][-1].content
     memory = f'''{{
-        user_question: {user_input},
-        assistant_output: {assistant_output}
+        "user_question": "{user_input}",
+        "assistant_output": "{assistant_output}"
     }}'''
 
     save_recall_memories(memory, config)
@@ -405,9 +417,9 @@ def build_agent():
     builder.add_edge("load_memories", "agent")
     # builder.add_conditional_edges("agent", route_tools, ["tools", END]) # llm with tools does it
     # builder.add_edge("tools", "agent")
-    builder.add_edge("agent", "save_user_interaction")
-    # builder.add_edge("agent", "judge")
-    # builder.add_conditional_edges("judge", route_decision, ["agent", "save_user_interaction"])
+    # builder.add_edge("agent", "save_user_interaction")
+    builder.add_edge("agent", "judge")
+    builder.add_conditional_edges("judge", route_decision, ["agent", "save_user_interaction"])
     builder.add_edge("save_user_interaction", END)
 
     memory = InMemorySaver()
@@ -455,16 +467,10 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str, created_at: s
 logging.info("chat_with_agent function created.")
 
 # for testing
-# if __name__ == '__main__':
-#     now = datetime.now(timezone.utc)
-#     # ISO8601 string with dynamic Z if UTC
-#     if now.tzinfo == timezone.utc:
-#         created_at_iso = now.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-#     else:
-#         # For non-UTC, include offset like +02:00
-#         created_at_iso = now.isoformat(timespec="seconds")
-
-#     created_at = now.strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
-#     # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+if __name__ == '__main__':
+    now = datetime.now(timezone.utc)
+    # ISO8601 string with dynamic Z if UTC  
+    created_at = now.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
+    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
 #     # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
 #     chat_with_agent("А завтра?", "user_123", "thread_456", created_at)
