@@ -65,12 +65,14 @@ client_qd = QdrantClient(url=QDRANT_URL)
 
 logging.info("Qdrant client initialized.")
 
+
+
 class State(MessagesState):
     question: BaseMessage
     messages: Optional[List[BaseMessage]] = None
     is_valid: Optional[str] = None
     judge_feedback: Optional[str] = None
-    retry_count: Optional[int]  # Track how many times reflection was attempted
+    retry_count: int = 0  # Track how many times reflection was attempted
 
 logging.info("Embeddings initializing.")
 
@@ -84,8 +86,9 @@ embeddings = OllamaEmbeddings(
     model=emb_model_name
 )
 
-logging.info(f"Using embeddings model: {emb_model_name}")
+# print(State.retry_count)
 
+logging.info(f"Using embeddings model: {emb_model_name}")
 
 # llm = ChatOpenAI(
 #     model=LLM_MODEL_NAME,
@@ -163,7 +166,7 @@ prompt = ChatPromptTemplate.from_messages(
             ## JUDGE FEEDBACK
 
             Judge feedback is provided by the LLM to evaluate the quality of responses from last interactions:
-            {{judge_feedback}}
+            {judge_feedback}
 
             ## RAG USAGE GUIDELINES
             
@@ -215,6 +218,8 @@ def load_memories(state: State, config: RunnableConfig) -> State:
     Returns:
         State: The updated state with loaded memories.
     """
+    state["retry_count"] = 0
+
     # Search for long-term memories in Qdrant
     search_recall_memories_runnable = RunnableLambda(search_recall_memories)
     recall_contents = search_recall_memories_runnable.invoke(
@@ -241,9 +246,13 @@ def load_memories(state: State, config: RunnableConfig) -> State:
         messages = state.get("messages", [])
 
     # Return updated state with the loaded memories added to the messages
+
+   
+
     return State(
         question=state["question"],
-        messages=messages        
+        messages=messages,
+        retry_count=state["retry_count"]
     )
 
 logging.info("Function for loading memories created.")
@@ -293,6 +302,8 @@ def agent(state: State) -> State:
     """
     bound = prompt | create_react_agent(llm, tools)
 
+    print(f'state messages: {state["messages"]}')
+
     recall_str = (
         "<recall_memory>\n" + "\n".join(str(m) for m in state["messages"]) + "\n</recall_memory>"
     )
@@ -303,9 +314,9 @@ def agent(state: State) -> State:
     if feedback:
         judge_feedback = f"<judge_feedback>\nThe previous answer was judged incorrect or unsafe.\nFeedback: {feedback}\n</judge_feedback>"
     else:
-        judge_feedback = "The previous answer was acceptable or it is first time to provide feedback."
+        judge_feedback = f"<judge_feedback></judge_feedback>"
 
-    print(f'agent judge feedback: {judge_feedback}')
+    print(f'judge feedback: {judge_feedback}')
     
 
     prediction = bound.invoke({
@@ -321,7 +332,8 @@ def agent(state: State) -> State:
     return State(
         question=state["question"],
         messages=state["messages"] + [prediction],
-        judge_feedback=None  # reset after using it
+        judge_feedback=None,  # reset after using it
+        retry_count=state['retry_count']
     )
 
 logging.info("Agent created.")
@@ -362,15 +374,21 @@ def judge(state: State) -> State:
     # print(f"Judge feedback: {feedback}")
 
     # set attr retry_count if not exists
-    if "retry_count" not in state:
-        state["retry_count"] = 0
+    # if "retry_count" not in state:
+    #     state["retry_count"] = 0
+
+    retry_count = state["retry_count"]
+
+    if retry_count <= MAX_RETRIES:
+        print(f"Retrying agent (attempt {retry_count + 1}/{MAX_RETRIES})")
+        state['retry_count'] = retry_count + 1
 
     return State(
         question=state["question"],        
         messages=state["messages"],        
         is_valid=is_valid,
         judge_feedback=feedback,
-        retry_count=state["retry_count"]
+        retry_count=state['retry_count']
     )
 
 
@@ -388,19 +406,13 @@ def route_decision(state: State) -> str:
 
     print(f"Current state: valid={state['is_valid']}, retries={retry_count}")
 
-    if state['is_valid']:
+    if state['is_valid'] or (retry_count + 1) == MAX_RETRIES:
         # Answer is fine → end flow
         return "save_user_interaction"
-
-    # If invalid but retries remain → retry agent
-    if retry_count < MAX_RETRIES:
-        state['retry_count'] = retry_count + 1
-        print(f"Retrying agent (attempt {state['retry_count']}/{MAX_RETRIES})")
+    else:   
         return "agent"
 
-    # Out of retries → stop and log feedback
-    print(f"Max retries reached. Judge feedback: {state['judge_feedback']}")
-    return "save_user_interaction"
+
 
 logging.info("Creating function for saving user interaction...")
 
@@ -456,6 +468,8 @@ def build_agent():
     memory = InMemorySaver()
   
     return builder.compile(checkpointer=memory)
+
+# add png for graph
 
 graph = build_agent()
 
