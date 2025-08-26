@@ -160,12 +160,12 @@ prompt = ChatPromptTemplate.from_messages(
 
             ## RECALL MEMORIES
             
-            Recall memories are contextually retrieved based on the current conversation:
+            Recall memories are contextually retrieved based on the current conversation:  
             {recall_memories}
 
             ## JUDGE FEEDBACK
 
-            Judge feedback is provided by the LLM to evaluate the quality of responses from last interactions:
+            Judge feedback is provided by the LLM to evaluate the hallucination, toxicity, relevance of response. Check current date: {current_date} 
             {judge_feedback}
 
             ## RAG USAGE GUIDELINES
@@ -185,7 +185,7 @@ prompt = ChatPromptTemplate.from_messages(
             Be attentive to subtle cues and underlying emotions. 
             Adapt your communication style to match the user's preferences, language and current emotional state. 
             If you use tools, call them internally and respond only after the tool operation 
-            completes successfully. Respond only with language is appropriate the user question.
+            completes successfully. Respond only with language is appropriate the user question. Check current date: {current_date}
             If user provides feedback, incorporate it into the conversation.
         """),
 
@@ -221,16 +221,10 @@ def load_memories(state: State, config: RunnableConfig) -> State:
     state["retry_count"] = 0
 
     # Search for long-term memories in Qdrant
-    search_recall_memories_runnable = RunnableLambda(search_recall_memories)
-    recall_contents = search_recall_memories_runnable.invoke(
-        state["question"].content
-    )
+    recall_contents = search_recall_memories(query=state["question"].content, config=config)
 
-    # search last 3 memories in Qdrant
-    search_recall_memories_runnable = RunnableLambda(search_recall_memories)
-    recall_contents = search_recall_memories_runnable.invoke(
-        state["question"].content
-    )
+    # search last 3 memories in Clickhouse by created_at if provided
+ 
 
     # If memories were found, merge them into one string
     if recall_contents:
@@ -318,11 +312,12 @@ def agent(state: State) -> State:
 
     print(f'judge feedback: {judge_feedback}')
     
-
+    
     prediction = bound.invoke({
         "judge_feedback": judge_feedback,
         "question": state["question"].content,
-        "recall_memories": recall_str,        
+        "recall_memories": recall_str,
+        "current_date": datetime.now().strftime("%Y-%m-%d"),
     })['messages'][-1]
 
     if hasattr(prediction, 'content'):

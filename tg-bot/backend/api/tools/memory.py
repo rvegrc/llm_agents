@@ -139,10 +139,7 @@ def search_recall_memories(
     )
  
 
-
-
-
     # return [doc.page_content for doc in documents]
-    return  [f'created at: {doc.metadata.get("created_at")}:, content: {doc.page_content}'
+    return  [f'record: {doc.page_content}, this record created at: {doc.metadata.get("created_at")},'
               for doc in documents]
 
