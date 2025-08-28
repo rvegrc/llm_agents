@@ -35,6 +35,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.graph import  END, START, MessagesState, StateGraph
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
+
 # from IPython.display import Image, display
 
 import os
@@ -506,11 +507,38 @@ def chat_with_agent(user_input: str, user_id: str, thread_id: str, created_at: s
 
 logging.info("chat_with_agent function created.")
 
+
+
 # for testing
 if __name__ == '__main__':
     now = datetime.now(timezone.utc)
     # ISO8601 string with dynamic Z if UTC  
     created_at = now.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") # human-readable format
-    chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
+    # query = "Какая погода в Пекине сегодня?"
+    query = """Ты middle data scientist, датасет с поездками: 'id', 'point', 'date', 'distance', 'duration', 'price'. 
+    Составь план проекта по анализу данных. Напиши код на python с использованием pandas и matplotlib с выводом графиков по каждой поездке."""
+    # chat_with_agent(query, "user_123", "thread_456", created_at)
 #     # chat_with_agent("Какая погода в Пекине сегодня?", "user_123", "thread_456", created_at)
 #     chat_with_agent("А завтра?", "user_123", "thread_456", created_at)
+
+    from langsmith import evaluate, Client
+    client = Client()
+    dataset_name = "bot_eval"
+
+    # 2. Define an evaluator
+    def exact_match(outputs: dict, reference_outputs: dict) -> bool:
+        return outputs == reference_outputs
+
+    # 3. Run an evaluation
+    # For more info on evaluators, see: https://docs.smith.langchain.com/concepts/evaluation#evaluators
+
+    # To evaluate an LCEL chain, replace lambda with chain.invoke
+    # To evaluate a LangGraph graph, replace lambda with graph.invoke
+    evaluate(
+        # lambda x: x["tools"] + "is a good question. I don't know the answer.",
+        # chain.invoke
+        chat_with_agent(query, "user_123", "thread_456", created_at),
+        data=dataset_name,
+        evaluators=[exact_match],
+        experiment_prefix="bot_eval experiment"
+    )
